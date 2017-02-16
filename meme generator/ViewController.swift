@@ -5,35 +5,43 @@
 //  Created by Eliazar Terrazas on 1/23/17.
 //  Copyright © 2017 Eliazar Terrazas. All rights reserved.
 //
-
+import Foundation
 import UIKit
 
 class ViewController: UIViewController, UIImagePickerControllerDelegate,
 UINavigationControllerDelegate, UITextFieldDelegate{
 
-    @IBOutlet weak var ImagePicker: UIImageView!
+    @IBOutlet weak var imagePicker: UIImageView!
    
     
+    @IBOutlet weak var shareButton: UIBarButtonItem!
+    @IBOutlet weak var toolBar: UIToolbar!
+   
     @IBOutlet weak var CameraButton: UIBarButtonItem!
     @IBOutlet weak var AlbumButton: UIToolbar!
     
     
     @IBAction func PickAnImageFromAlbum(_ sender: AnyObject) {
-        let imagePicker = UIImagePickerController()
-        imagePicker.delegate = self
-        imagePicker.sourceType = .photoLibrary
-        present(imagePicker, animated: true, completion: nil)
+        imagePickerRegister("Photo")
     }
     @IBAction func PickAnImageFromCamera(_ sender: AnyObject) {
-        let imagePicker = UIImagePickerController()
-        imagePicker.delegate = self
-        imagePicker.sourceType = .camera
-        present(imagePicker, animated: true, completion: nil)
+        imagePickerRegister("Camera")
     }
     
+    func imagePickerRegister(_ type : String){
+        
+        //Figure out which resource to call
+        let imagePicker = UIImagePickerController()
+        imagePicker.delegate = self
+        imagePicker.sourceType = (type == "Photo") ? UIImagePickerControllerSourceType.photoLibrary : UIImagePickerControllerSourceType.camera
+        present(imagePicker, animated: true, completion: nil)
+        
+        shareButton.isEnabled = true //Enable share button after image picked.
+        
+    }
+    
+    
     @IBOutlet weak var topTextField: UITextField!
-    
-    
     @IBOutlet weak var lowerTextField: UITextField!
     
     //Define my text for my memes
@@ -49,19 +57,19 @@ UINavigationControllerDelegate, UITextFieldDelegate{
     override func viewDidLoad() {
         super.viewDidLoad()
         topTextField.delegate = self
-        topTextField.text = "type here"
-        topTextField.defaultTextAttributes = memeTextAttributes
-        topTextField.textAlignment = NSTextAlignment.center
-        topTextField.backgroundColor = UIColor.clear
-        topTextField.borderStyle = .none
         lowerTextField.delegate = self
-        lowerTextField.text = "type here"
-        lowerTextField.defaultTextAttributes = memeTextAttributes
-        lowerTextField.textAlignment = NSTextAlignment.center
-        lowerTextField.backgroundColor = UIColor.clear
-        lowerTextField.borderStyle = .none
+        styleTextField(topTextField)
+        styleTextField(lowerTextField)
+    }
+    
+    func styleTextField(_ textField: UITextField){
         
-        
+        //Style our text fields
+        textField.text = "type here"
+        textField.defaultTextAttributes = memeTextAttributes
+        textField.backgroundColor = UIColor.clear
+        textField.borderStyle = .none
+        textField.textAlignment = NSTextAlignment.center
     }
     
     func textFieldShouldReturn (_ textField: UITextField) -> Bool{
@@ -85,16 +93,16 @@ UINavigationControllerDelegate, UITextFieldDelegate{
     
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [String : Any]) {
         if let image = info["UIImagePickerControllerOriginalImage"] as? UIImage {
-            ImagePicker.image = image
+            imagePicker.image = image
             dismiss(animated: true, completion: nil)
         }
     }
 
     
-    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-         dismiss(animated: true, completion: nil)
-    }
-
+    @IBAction func imageCancel(_ sender: UIBarButtonItem) {
+    dismiss(animated: true, completion: nil)}
+    
+    
     
     func subscribeToKeyboardNotifications() {
         
@@ -122,13 +130,8 @@ UINavigationControllerDelegate, UITextFieldDelegate{
     
     func keyboardWillHide(_ notification: Notification) {
         
-        if lowerTextField.isFirstResponder
-        {
             //Reset keyboard value
-            view.frame.origin.y += getKeyboardHeight(notification)
-
-        }
-        
+            view.frame.origin.y = 0
     }
     
     func getKeyboardHeight(_ notification: Notification) -> CGFloat {
@@ -141,7 +144,58 @@ UINavigationControllerDelegate, UITextFieldDelegate{
     
     func save(_ memedImage : UIImage) {
         // Create the meme
-        let meme = Meme(topTextField: topTextField.text!, lowerTextField : lowerTextField.text!, imageView: imageView.image!, memedImage: memedImage)
+        let meme = Meme(topTextField: topTextField.text!, lowerTextField : lowerTextField.text!, imageView: imagePicker.image!, memedImage: memedImage)
+        //Add meme to array in app delegate
+        (UIApplication.shared.delegate as! AppDelegate).memes.append(meme)
+        _ = (UIApplication.shared.delegate as! AppDelegate).memes
+        
+        }
+    
+    func generateMemedImage() -> UIImage {
+        
+        // Hide toolbar
+        toolBar.isHidden = true
+        AlbumButton.isHidden = true
+        
+        navigationController?.navigationBar.isHidden = true
+        navigationController?.toolbar.isHidden = true
+
+        
+        // Render view to an image
+        UIGraphicsBeginImageContext(self.view.frame.size)
+        view.drawHierarchy(in: self.view.frame, afterScreenUpdates: true)
+        let memedImage:UIImage = UIGraphicsGetImageFromCurrentImageContext()!
+        UIGraphicsEndImageContext()
+        
+        //Show toolbar
+        AlbumButton.isHidden = false
+        toolBar.isHidden = false
+
+        
+        return memedImage
+    }
+    
+    @IBAction func shareButton(_ sender: UIBarButtonItem) {
+        //Call UIActivityViewController
+        let memedImage = generateMemedImage()
+        let activityViewController = UIActivityViewController(activityItems: [memedImage], applicationActivities: nil)
+        
+        //Handler for completion
+        activityViewController.completionWithItemsHandler = { activity, success, items, error in
+            
+            if(success == true){
+                //Generate a memed image
+                self.save(memedImage);
+                
+                //Dismiss
+                self.dismiss(animated: true, completion: nil)
+            }
+
+        }
     }
 }
+
+
+
+
 
